@@ -251,7 +251,7 @@ function calc_U_param(T, Phi1, Phi2, a1p, a2p)
 end
 
 
-function calc_log_U(T, Phi1, Phi2, a1p, a2p)
+function calc_log_U(T, Phi1, Phi2)
     x=T0 / T
     aT = a0 + a1 * x + a2 * x^2
     log_term = log(1 - 6*(Phi1*Phi2) + 4*(Phi1^3 + Phi2^3) - 3*(Phi1*Phi2)^2)
