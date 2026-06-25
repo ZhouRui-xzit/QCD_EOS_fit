@@ -4,9 +4,7 @@ include("constants.jl")
 using ForwardDiff # AD
 using NaNMath   # nanlog
 using FastGaussQuadrature  # Gauss-Legendre 积分
-using MeshGrid # meshgrid
-using NLsolve # 非线性方程组求解器
-using NaNMath
+import NonlinearSolve
 using DelimitedFiles
 using LinearAlgebra
 
@@ -26,6 +24,17 @@ function get_nodes(p_num)
     int1 = (p1, w1)
     int2 = (p2, w2)
     return int1, int2
+end
+
+function solve_nonlinear_system(f, x0::AbstractVector; ftol = 1e-8, xtol = 1e-8, iterations = 1000)
+    prob = NonlinearSolve.NonlinearProblem((u, p) -> f(u), copy(x0))
+    sol = NonlinearSolve.solve(prob; abstol = ftol, reltol = xtol, maxiters = iterations)
+    return sol.u, sol
+end
+
+function nonlinear_zero(f, x0::AbstractVector; kwargs...)
+    x, _ = solve_nonlinear_system(f, x0; kwargs...)
+    return x
 end
 
 
@@ -215,8 +224,7 @@ end
 
 function Tmu(X0, mu_B, T, ints)
     fWrapper(Xs) = Quark_mu(Xs, mu_B, T, ints)
-    res = nlsolve(fWrapper, X0, autodiff=:forward)
-    NewX = res.zero
+    NewX = nonlinear_zero(fWrapper, X0)
     return NewX
 end
 
@@ -225,8 +233,7 @@ end
 
 function Trho(X0, T, rho, ints)
     fWrapper(Xs) = Quark_rho(Xs, T, rho, ints)
-    res = nlsolve(fWrapper, X0, autodiff=:forward)
-    NewX = res.zero
+    NewX = nonlinear_zero(fWrapper, X0)
     return NewX
 end
 
@@ -242,6 +249,22 @@ function calc_U_param(T, Phi1, Phi2, a1p, a2p)
     J = (27/(24*pi^2)) * (1 - 6*(Phi1*Phi2) + 4*(Phi1^3 + Phi2^3) - 3*(Phi1*Phi2)^2)
     return T^4*term1
 end
+
+
+function calc_log_U(T, Phi1, Phi2, a1p, a2p)
+    x=T0 / T
+    aT = a0 + a1 * x + a2 * x^2
+    log_term = log(1 - 6*(Phi1*Phi2) + 4*(Phi1^3 + Phi2^3) - 3*(Phi1*Phi2)^2)
+    term = -aT/2 * Phi1 * Phi2 + b3 * x^3 * log_term
+    return T^4*term
+end
+
+
+
+
+
+
+
 
 """
     Omega_param(orders, mus, T, ints, a1p, a2p)
@@ -304,8 +327,7 @@ end
 """
 function Tmu_param(X0, mu_B, T, ints, a1p, a2p)
     fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T, ints, a1p, a2p)
-    res = nlsolve(fWrapper, X0, autodiff=:forward)
-    NewX = res.zero
+    NewX = nonlinear_zero(fWrapper, X0)
     return NewX
 end
 

@@ -3,7 +3,8 @@
 using Printf
 using LinearAlgebra
 using ForwardDiff
-using Optim
+using Optimization
+using OptimizationOptimJL: LBFGS
 using Distributions
 using Turing
 using Plots
@@ -76,8 +77,7 @@ function solve_order_param(T, ints, x0::AbstractVector, theta::AbstractVector)
     a1p, a2p = theta
     mu_B = zero(T)
     fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T, ints, a1p, a2p)
-    res = nlsolve(fWrapper, copy(x0), autodiff = :forward, ftol = 1e-12, xtol = 1e-12, iterations = 600)
-    x = res.zero
+    x = nonlinear_zero(fWrapper, x0; ftol = 1e-12, xtol = 1e-12, iterations = 600)
     return x, norm(fWrapper(x))
 end
 
@@ -243,7 +243,13 @@ function train_implicit(data::ImplicitFitData, theta0::Vector{Float64}; maxiter:
     eval_counter = Ref(0)
     best = Ref((loss = Inf, theta = copy(theta0), pred = Float64[]))
 
-    function fg!(F, G, u)
+    function objective(u, p)
+        theta, _ = u_to_theta_and_jac(u, data)
+        loss, _, _ = loss_and_grad_theta(theta, data; need_grad = false)
+        return loss
+    end
+
+    function fg!(G, u, p)
         theta, jac = u_to_theta_and_jac(u, data)
         loss, grad_theta, pred = loss_and_grad_theta(theta, data; need_grad = true)
         eval_counter[] += 1
@@ -261,11 +267,18 @@ function train_implicit(data::ImplicitFitData, theta0::Vector{Float64}; maxiter:
             G[1] = grad_theta[1] * jac[1]
             G[2] = grad_theta[2] * jac[2]
         end
-        return F === nothing ? nothing : loss
+        return loss
     end
 
-    result = optimize(Optim.only_fg!(fg!), u0, LBFGS(), Optim.Options(iterations = maxiter, show_trace = true, show_every = 1))
-    theta_opt, _ = u_to_theta_and_jac(Optim.minimizer(result), data)
+    function grad!(G, u, p)
+        fg!(G, u, p)
+        return nothing
+    end
+
+    optf = Optimization.OptimizationFunction(objective; grad = grad!, fg = fg!)
+    prob = Optimization.OptimizationProblem(optf, u0, nothing)
+    result = Optimization.solve(prob, LBFGS(); maxiters = maxiter, show_trace = true, show_every = 1)
+    theta_opt, _ = u_to_theta_and_jac(result.u, data)
     final_loss, _, final_pred = loss_and_grad_theta(theta_opt, data; need_grad = true)
 
     if final_loss < best[].loss && length(final_pred) == length(data.Ts)
@@ -292,7 +305,7 @@ function run()
     data = build_fit_data(csv_path = csv_path, p_num = p_num, a1lo = a1lo, a1hi = a1hi, a2lo = a2lo, a2hi = a2hi)
     theta0 = [a1_start, a2_start]
 
-    mode_label = turing_map == 0 ? "Optim LBFGS with implicit AD gradient" : "Turing MAP with AutoFiniteDiff"
+    mode_label = turing_map == 0 ? "Optimization.jl LBFGS with implicit AD gradient" : "Turing MAP with AutoFiniteDiff"
     println("Turing v", pkgversion(Turing), " + ", mode_label)
     @printf("bounds: a1=[%.6f, %.6f], a2=[%.6f, %.6f], p_num=%d\n", a1lo, a1hi, a2lo, a2hi, p_num)
     @printf("start:  a1=%.12f, a2=%.12f\n", theta0[1], theta0[2])
@@ -314,7 +327,7 @@ function run()
     @printf("   a2 = %.12f\n", best.theta[2])
     @printf("   loss = %.12f\n", best.loss)
     if turing_map == 0
-        println("   Optim converged: ", Optim.converged(result))
+        println("   Optimization retcode: ", result.retcode)
     else
         println("   Turing MAP lp: ", result.lp)
     end

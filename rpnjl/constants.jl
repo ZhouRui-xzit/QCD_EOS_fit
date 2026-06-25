@@ -18,7 +18,7 @@ const g_D = GD_Lambda5 / Lambda^5
 # Polyakov 常数
 const T0 = 175/hc 
 
-
+"""
 const a0 = 6.75
 const a1 = -9.8
 const a2 = 0.26
@@ -26,3 +26,10 @@ const a2 = 0.26
 const b3 = 0.805
 const b4 = 7.555
 const kappa = 0.00
+"""
+
+# for ln-polyakov
+const a0 = 3.51
+const a1 = -2.47
+const a2 = 15.2
+const b3 = -1.75

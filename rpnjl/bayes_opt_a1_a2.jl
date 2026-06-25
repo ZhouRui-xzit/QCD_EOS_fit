@@ -4,7 +4,6 @@ using Printf
 using Random
 using LinearAlgebra
 using Statistics
-using SpecialFunctions: erf
 using Plots
 
 include(joinpath(@__DIR__, "train_a1_a2.jl"))
@@ -31,8 +30,7 @@ function solve_Tmu_130_for_param(T130, ints, x0_init::AbstractVector, a1p::Float
     try
         mu_B = zero(T130)
         fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T130, ints, a1p, a2p)
-        res = nlsolve(fWrapper, copy(x0_init), autodiff = :forward, ftol = 1e-12, xtol = 1e-12, iterations = 400)
-        x_ok = res.zero
+        x_ok = nonlinear_zero(fWrapper, x0_init; ftol = 1e-12, xtol = 1e-12, iterations = 400)
         if all(isfinite, x_ok)
             return x_ok
         end
@@ -130,7 +128,14 @@ function gp_predict_z(model, Xstar::AbstractMatrix)
 end
 
 normal_pdf(z) = inv(sqrt(2pi)) * exp(-0.5 * z * z)
-normal_cdf(z) = 0.5 * (1.0 + erf(z / sqrt(2.0)))
+function normal_cdf(z::Real)
+    x = Float64(z)
+    ax = abs(x)
+    t = inv(1.0 + 0.2316419 * ax)
+    poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
+    cdf_pos = 1.0 - normal_pdf(ax) * poly
+    return x >= 0 ? cdf_pos : 1.0 - cdf_pos
+end
 
 function expected_improvement(mu::Float64, sigma::Float64, best_z::Float64, xi::Float64)
     if sigma <= 1e-12

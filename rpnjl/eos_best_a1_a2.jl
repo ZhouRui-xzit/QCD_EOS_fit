@@ -45,8 +45,7 @@ end
 function solve_order_param(T, ints, x0::AbstractVector, a1p::Float64, a2p::Float64)
     mu_B = zero(T)
     fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T, ints, a1p, a2p)
-    res = nlsolve(fWrapper, copy(x0), autodiff = :forward, ftol = 1e-12, xtol = 1e-12, iterations = 600)
-    x = res.zero
+    x = nonlinear_zero(fWrapper, x0; ftol = 1e-12, xtol = 1e-12, iterations = 600)
     return x, norm(fWrapper(x))
 end
 

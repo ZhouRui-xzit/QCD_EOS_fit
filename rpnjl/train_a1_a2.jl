@@ -149,8 +149,7 @@ function solve_Tmu_precise_130(;
     function try_one(x_try)
         try
             fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T130, ints, a1_0, a2_0)
-            res = nlsolve(fWrapper, x_try, autodiff=:forward, ftol=1e-14, xtol=1e-14, iterations=800)
-            x_ok = res.zero
+            x_ok = nonlinear_zero(fWrapper, x_try; ftol = 1e-14, xtol = 1e-14, iterations = 800)
             if !all(isfinite, x_ok)
                 return nothing, Inf
             end
@@ -259,7 +258,7 @@ function main()
     println(">> 方法说明：")
     println("   1) 使用 ForwardDiff 计算目标函数关于 (a1, a2) 的梯度（全量批次）")
     println("   2) 用固定步长的梯度下降更新 θ=[a1, a2]")
-    println("   3) 每个温度点用 warm-start 的解作为初值，减少 nlsolve 的重复收敛成本")
+    println("   3) 每个温度点用 warm-start 的解作为初值，减少 NonlinearSolve 的重复收敛成本")
 
     x0_130 = solve_Tmu_precise_130()
     baseline = run_baseline(x0_init = x0_130)

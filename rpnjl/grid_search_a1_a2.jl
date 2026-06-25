@@ -36,8 +36,7 @@ function solve_Tmu_130_for_param(T130, ints, x0_init::AbstractVector, a1p::Float
     try
         mu_B = zero(T130)
         fWrapper(Xs) = Quark_mu_param(Xs, mu_B, T130, ints, a1p, a2p)
-        res = nlsolve(fWrapper, copy(x0_init), autodiff = :forward, ftol = 1e-12, xtol = 1e-12, iterations = 400)
-        x_ok = res.zero
+        x_ok = nonlinear_zero(fWrapper, x0_init; ftol = 1e-12, xtol = 1e-12, iterations = 400)
         if all(isfinite, x_ok)
             return x_ok
         end
