@@ -251,25 +251,13 @@ function calc_U_param(T, Phi1, Phi2, a1p, a2p)
 end
 
 
-function calc_log_U(T, Phi1, Phi2)
-    x=T0 / T
-    aT = a0 + a1 * x + a2 * x^2
-    log_term = log(1 - 6*(Phi1*Phi2) + 4*(Phi1^3 + Phi2^3) - 3*(Phi1*Phi2)^2)
-    term = -aT/2 * Phi1 * Phi2 + b3 * x^3 * log_term
-    return T^4*term
-end
-
-
-
-
-
 
 
 
 """
-    Omega_param(orders, mus, T, ints, a1p, a2p)
+    Omega_param(orders, mu_B, T, ints, a1p, a2p)
 """
-function Omega_param(orders, mus, T, ints, a1p, a2p)
+function Omega_param(orders, mu_B, T, ints, a1p, a2p)
     p1, w1 = ints[1]
     p2, w2 = ints[2]
 
@@ -280,8 +268,9 @@ function Omega_param(orders, mus, T, ints, a1p, a2p)
     U = calc_U_param(T, Phi1, Phi2, a1p, a2p)
     Masses = Mass(phi)
     Omega_q = 0.0
+    mu = mu_B / 3.0
     for flavor = 1:3
-        mu = mus[flavor] 
+        
         mass = Masses[flavor]
         vacuum_term =  calculate_vacuum_term(p1, w1, mass)
         thermal_term = calculate_thermal_term(p2, w2, mass, T, mu, Phi1, Phi2)
@@ -293,17 +282,17 @@ function Omega_param(orders, mus, T, ints, a1p, a2p)
 end
 
 """
-    dOmega_dorder_param(orders, mus, T, ints, a1p, a2p)
+    dOmega_dorder_param(orders, mu_B, T, ints, a1p, a2p)
 """
-function dOmega_dorder_param(orders, mus, T, ints, a1p, a2p)
-    return ForwardDiff.gradient(x -> Omega_param(x, mus, T, ints, a1p, a2p), orders)
+function dOmega_dorder_param(orders, mu_B, T, ints, a1p, a2p)
+    return ForwardDiff.gradient(x -> Omega_param(x, mu_B, T, ints, a1p, a2p), orders)
 end
 
 """
-    dOmega_dT_param(orders, mus, T, ints, a1p, a2p)
+    dOmega_dT_param(orders, mu_B, T, ints, a1p, a2p)
 """
-function dOmega_dT_param(orders, mus, T, ints, a1p, a2p)
-    return ForwardDiff.derivative(x -> Omega_param(orders, mus, x, ints, a1p, a2p), T)
+function dOmega_dT_param(orders, mu_B, T, ints, a1p, a2p)
+    return ForwardDiff.derivative(x -> Omega_param(orders, mu_B, x, ints, a1p, a2p), T)
 end
 
 """
@@ -313,13 +302,27 @@ end
 function Quark_mu_param(X0, mu_B, T, ints, a1p, a2p)
     T_out = promote_type(eltype(X0), typeof(T), typeof(mu_B), typeof(a1p), typeof(a2p))
     orders = X0[1:5]
-    mus = [1/3*mu_B, 1/3*mu_B, 1/3*mu_B]
 
     fvec = zeros(T_out, 5)
-    fvec[1:5] = dOmega_dorder_param(orders, mus, T, ints, a1p, a2p)
+    fvec[1:5] = dOmega_dorder_param(orders, mu_B, T, ints, a1p, a2p)
 
     return fvec
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 """
     Tmu_param(X0, mu_B, T, ints, a1p, a2p)
@@ -364,7 +367,7 @@ function sT3_fit_objective(theta::AbstractVector, Ts, target, err, ints, x0_init
     for i in 1:ndata
         Ti = Ts[i] / hc
         X = Tmu_param(X, zero(T_out), Ti, ints, a1p, a2p)
-        s = -dOmega_dT_param(X, [zero(T_out), zero(T_out), zero(T_out)], Ti, ints, a1p, a2p)
+        s = -dOmega_dT_param(X, zero(T_out), Ti, ints, a1p, a2p)
         pred[i] = s / (Ti^3)
 
         sigma = err[i] > 0 ? T_out(err[i]) : one(T_out)
